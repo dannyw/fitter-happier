@@ -1,0 +1,44 @@
+# Data — never commit real health data
+data/
+raw/
+*.duckdb
+*.duckdb.wal
+*.xml
+*.zip
+*.fit
+*.gpx
+*.csv
+*.parquet
+*.json
+
+# But DO allow test fixtures
+!tests/fixtures/
+!tests/fixtures/**
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# uv
+.python-version
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp

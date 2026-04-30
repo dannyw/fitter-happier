@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Apple Health Export"
+     xmlns="http://www.topografix.com/GPX/1/1">
+ <trk>
+  <name>Route 2024-01-15</name>
+  <trkseg>
+   <trkpt lat="40.7580" lon="-73.9855">
+    <ele>10.2</ele>
+    <time>2024-01-15T06:05:00Z</time>
+   </trkpt>
+   <trkpt lat="40.7590" lon="-73.9845">
+    <ele>10.5</ele>
+    <time>2024-01-15T06:10:00Z</time>
+   </trkpt>
+   <trkpt lat="40.7600" lon="-73.9835">
+    <ele>11.0</ele>
+    <time>2024-01-15T06:15:00Z</time>
+   </trkpt>
+   <trkpt lat="40.7610" lon="-73.9825">
+    <ele>11.8</ele>
+    <time>2024-01-15T06:20:00Z</time>
+   </trkpt>
+   <trkpt lat="40.7620" lon="-73.9815">
+    <ele>12.3</ele>
+    <time>2024-01-15T06:25:00Z</time>
+   </trkpt>
+  </trkseg>
+ </trk>
+</gpx>

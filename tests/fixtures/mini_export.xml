@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE HealthData [
+<!ATTLIST HealthData locale CDATA #REQUIRED>
+]>
+<HealthData locale="en_US">
+ <ExportDate value="2024-01-15 10:00:00 -0500"/>
+
+ <!-- Health metric: resting heart rate -->
+ <Record type="HKQuantityTypeIdentifierRestingHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-14 08:00:00 -0500"
+         endDate="2024-01-14 08:00:00 -0500"
+         value="52"/>
+
+ <!-- Health metric: HRV -->
+ <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+         sourceName="Apple Watch" unit="ms"
+         startDate="2024-01-14 07:30:00 -0500"
+         endDate="2024-01-14 07:30:00 -0500"
+         value="45.5"/>
+
+ <!-- HR samples during workout 1 window (06:00-07:00 UTC = 01:00-02:00 -0500) -->
+ <Record type="HKQuantityTypeIdentifierHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-15 01:10:00 -0500"
+         endDate="2024-01-15 01:10:00 -0500"
+         value="145"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-15 01:20:00 -0500"
+         endDate="2024-01-15 01:20:00 -0500"
+         value="152"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-15 01:30:00 -0500"
+         endDate="2024-01-15 01:30:00 -0500"
+         value="158"/>
+
+ <!-- HR samples during workout 2 window (15:00-16:00 UTC = 10:00-11:00 -0500) -->
+ <Record type="HKQuantityTypeIdentifierHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-15 10:15:00 -0500"
+         endDate="2024-01-15 10:15:00 -0500"
+         value="120"/>
+ <Record type="HKQuantityTypeIdentifierHeartRate"
+         sourceName="Apple Watch" unit="count/min"
+         startDate="2024-01-15 10:30:00 -0500"
+         endDate="2024-01-15 10:30:00 -0500"
+         value="125"/>
+
+ <!-- Workout 1: morning run -->
+ <Workout workoutActivityType="HKWorkoutActivityTypeRunning"
+          duration="45" durationUnit="min"
+          sourceName="Apple Watch"
+          startDate="2024-01-15 01:00:00 -0500"
+          endDate="2024-01-15 02:00:00 -0500"
+          device="&lt;&lt;HKDevice: 0x123, name:Apple Watch, manufacturer:Apple&gt;&gt;">
+  <WorkoutStatistics type="HKQuantityTypeIdentifierDistanceWalkingRunning"
+                     sum="5.2" unit="km"/>
+  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned"
+                     sum="380" unit="kcal"/>
+  <WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate"
+                     average="150" maximum="172" unit="count/min"/>
+  <MetadataEntry key="HKElevationAscended" value="42.5"/>
+  <MetadataEntry key="HKExternalUUID" value="abc-123-def"/>
+  <WorkoutRoute>
+   <FileReference path="/workout-routes/route_2024-01-15.gpx"/>
+  </WorkoutRoute>
+ </Workout>
+
+ <!-- Workout 2: yoga -->
+ <Workout workoutActivityType="HKWorkoutActivityTypeYoga"
+          duration="60" durationUnit="min"
+          sourceName="Apple Watch"
+          startDate="2024-01-15 10:00:00 -0500"
+          endDate="2024-01-15 11:00:00 -0500">
+ </Workout>
+
+ <!-- Sleep record -->
+ <Record type="HKCategoryTypeIdentifierSleepAnalysis"
+         sourceName="Apple Watch"
+         startDate="2024-01-14 22:30:00 -0500"
+         endDate="2024-01-15 00:30:00 -0500"
+         value="HKCategoryValueSleepAnalysisAsleepCore"/>
+</HealthData>

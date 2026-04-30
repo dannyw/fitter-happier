@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2">
+  <Activities>
+    <Activity Sport="Running">
+      <Id>2024-01-15T06:05:00Z</Id>
+      <Lap StartTime="2024-01-15T06:05:00Z">
+        <TotalTimeSeconds>600</TotalTimeSeconds>
+        <DistanceMeters>1500.0</DistanceMeters>
+        <Calories>120</Calories>
+        <Track>
+          <Trackpoint>
+            <Time>2024-01-15T06:05:00Z</Time>
+            <Position>
+              <LatitudeDegrees>40.7580</LatitudeDegrees>
+              <LongitudeDegrees>-73.9855</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>10.2</AltitudeMeters>
+            <HeartRateBpm>
+              <Value>142</Value>
+            </HeartRateBpm>
+            <Cadence>85</Cadence>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2024-01-15T06:05:05Z</Time>
+            <Position>
+              <LatitudeDegrees>40.7582</LatitudeDegrees>
+              <LongitudeDegrees>-73.9852</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>10.5</AltitudeMeters>
+            <HeartRateBpm>
+              <Value>148</Value>
+            </HeartRateBpm>
+            <Cadence>86</Cadence>
+          </Trackpoint>
+          <Trackpoint>
+            <Time>2024-01-15T06:05:10Z</Time>
+            <Position>
+              <LatitudeDegrees>40.7585</LatitudeDegrees>
+              <LongitudeDegrees>-73.9848</LongitudeDegrees>
+            </Position>
+            <AltitudeMeters>11.0</AltitudeMeters>
+            <HeartRateBpm>
+              <Value>155</Value>
+            </HeartRateBpm>
+            <Cadence>88</Cadence>
+          </Trackpoint>
+        </Track>
+      </Lap>
+    </Activity>
+  </Activities>
+</TrainingCenterDatabase>
