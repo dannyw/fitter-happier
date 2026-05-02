@@ -24,3 +24,7 @@ uv run streamlit run src/app/Home.py
 ## Status
 
 v1 in progress. See `DESIGN.md` for scope.
+
+## License
+
+MIT — see [`LICENSE`](./LICENSE).
