@@ -227,7 +227,8 @@ def _backfill_open_meteo(con: duckdb.DuckDBPyConnection) -> int:
         JOIN routes r ON w.workout_id = r.workout_id
         LEFT JOIN weather wx ON w.workout_id = wx.workout_id
         WHERE wx.workout_id IS NULL
-        AND json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1'
+        AND (json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') IS NULL
+             OR json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1')
         ORDER BY w.start_time
     """).fetchall()
 
@@ -300,7 +301,8 @@ def enrich_weather(
                 JOIN routes r ON w.workout_id = r.workout_id
                 LEFT JOIN weather wx ON w.workout_id = wx.workout_id
                 WHERE wx.workout_id IS NULL
-                AND json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1'
+                AND (json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') IS NULL
+                     OR json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1')
             """).fetchone()[0]
             print(
                 f"Backfilling {remaining} workouts from Open-Meteo ...",

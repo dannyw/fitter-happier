@@ -55,6 +55,10 @@ notebooks/    # one-off explorations, optional
 - `uv run streamlit run src/app/Home.py` — launch dashboard
 - `make refresh` — runs ingest + enrich (once Makefile exists)
 
+## Display units
+
+- **Distance is always in miles.** DuckDB stores `distance_m` in meters; convert to miles (`distance_m / 1609.344`) at the display layer. Never show km in dashboards.
+
 ## Things to be careful about
 
 - **The Apple Health XML can be hundreds of MB.** Stream-parse with `lxml.etree.iterparse`, don't load it all into memory.

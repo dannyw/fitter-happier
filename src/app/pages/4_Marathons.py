@@ -1,7 +1,8 @@
-"""Half Marathons — race analysis dashboard."""
+"""Marathons — race analysis dashboard."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import duckdb
@@ -11,8 +12,8 @@ import streamlit as st
 
 DB_PATH = Path("data/fitness.duckdb")
 
-st.set_page_config(page_title="Half Marathons", layout="wide")
-st.title("Half Marathons")
+st.set_page_config(page_title="Marathons", layout="wide")
+st.title("Marathons")
 
 
 @st.cache_resource
@@ -23,9 +24,8 @@ def get_con() -> duckdb.DuckDBPyConnection:
 con = get_con()
 
 # ---------------------------------------------------------------------------
-# Query: race-pace half marathons (20.5-22.5 km, sub-11 min/mi)
-# Dedup: when two records share the same date, keep the one with more route
-# data (Apple Watch native over Strava import).
+# Query: marathon-distance runs (25.5-27.5 miles, sub-14 min/mi pace)
+# Dedup: when two records share the same date, keep the one with more route data.
 # ---------------------------------------------------------------------------
 races_df = con.execute("""
     WITH ranked AS (
@@ -39,25 +39,26 @@ races_df = con.execute("""
             w.max_hr,
             w.elevation_gain_m,
             w.device,
+            w.raw,
             ROW_NUMBER() OVER (
                 PARTITION BY CAST(w.start_time AS DATE)
                 ORDER BY (SELECT count(*) FROM routes r WHERE r.workout_id = w.workout_id) DESC
             ) AS rn
         FROM workouts w
         WHERE w.activity_type = 'running'
-          AND w.distance_m BETWEEN 20500 AND 22500
+          AND w.distance_m / 1609.344 BETWEEN 25.5 AND 27.5
           AND w.duration_sec > 0
-          AND (w.duration_sec / (w.distance_m / 1609.344) / 60) < 11
+          AND (w.duration_sec / (w.distance_m / 1609.344) / 60) < 14
     )
     SELECT workout_id, start_time, date, duration_sec, distance_m,
-           avg_hr, max_hr, elevation_gain_m, device
+           avg_hr, max_hr, elevation_gain_m, device, raw
     FROM ranked
     WHERE rn = 1
     ORDER BY start_time
 """).fetchdf()
 
 if races_df.empty:
-    st.info("No half marathon races found.")
+    st.info("No marathon races found.")
     st.stop()
 
 # Derived columns
@@ -71,7 +72,7 @@ races_df["pace_min_mi"] = (races_df["duration_sec"] / miles / 60).round(2)
 def _fmt_finish(sec: int) -> str:
     h, rem = divmod(int(sec), 3600)
     m, s = divmod(rem, 60)
-    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+    return f"{h}:{m:02d}:{s:02d}"
 
 
 def _fmt_pace(sec: float, dist_mi: float) -> str:
@@ -85,9 +86,50 @@ races_df["pace_fmt"] = [
     _fmt_pace(s, d) for s, d in zip(races_df["duration_sec"], miles, strict=True)
 ]
 
+# Extract event name/description from raw JSON (Strava metadata)
+def _extract_event_name(raw_str: str) -> str:
+    try:
+        data = json.loads(raw_str)
+        return (
+            data.get("strava_activity_name")
+            or data.get("Activity Name")
+            or ""
+        )
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+
+def _extract_description(raw_str: str) -> str:
+    try:
+        data = json.loads(raw_str)
+        return (
+            data.get("strava_description")
+            or data.get("Activity Description")
+            or ""
+        )
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+
+def _extract_gear(raw_str: str) -> str:
+    try:
+        data = json.loads(raw_str)
+        return (
+            data.get("strava_gear")
+            or data.get("Activity Gear")
+            or ""
+        )
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+
+races_df["event"] = races_df["raw"].apply(_extract_event_name)
+races_df["description"] = races_df["raw"].apply(_extract_description)
+races_df["gear"] = races_df["raw"].apply(_extract_gear)
+
 # Join weather
 weather_df = con.execute(
-    "SELECT workout_id, temp_c, humidity_pct, conditions FROM weather"
+    "SELECT workout_id, temp_c, humidity_pct, wind_speed_mps, conditions FROM weather"
 ).fetchdf()
 races_df = races_df.merge(weather_df, on="workout_id", how="left")
 races_df["temp_f"] = (races_df["temp_c"] * 9 / 5 + 32).round(0)
@@ -101,24 +143,27 @@ c1.metric("Races", len(races_df))
 c2.metric("PR", pr_row["finish_fmt"], help=str(pr_row["date"].date()))
 c3.metric("Latest", latest["finish_fmt"], help=str(latest["date"].date()))
 delta_sec = latest["duration_sec"] - pr_row["duration_sec"]
-c4.metric("vs PR", f"{'+' if delta_sec >= 0 else ''}{delta_sec / 60:+.1f} min")
+sign = "+" if delta_sec >= 0 else ""
+c4.metric("vs PR", f"{sign}{delta_sec / 60:.1f} min")
 
 # --- Race summary table ---
 st.subheader("All races")
-table_cols = {
-    "date": "Date",
-    "finish_fmt": "Finish",
-    "pace_fmt": "Pace /mi",
-    "miles": "Miles",
-    "avg_hr": "Avg HR",
-    "max_hr": "Max HR",
-    "temp_f": "Temp (F)",
-    "conditions": "Conditions",
-}
-display = races_df[list(table_cols.keys())].copy()
-display.columns = list(table_cols.values())
-display["Date"] = display["Date"].dt.date
-st.dataframe(display, use_container_width=True, hide_index=True)
+table_data = races_df[
+    ["date", "event", "finish_fmt", "pace_fmt", "miles", "avg_hr", "max_hr",
+     "elevation_gain_m", "temp_f", "conditions", "gear"]
+].copy()
+table_data.columns = [
+    "Date", "Event", "Finish", "Pace /mi", "Miles", "Avg HR", "Max HR",
+    "Elevation (m)", "Temp (F)", "Conditions", "Gear",
+]
+table_data["Date"] = table_data["Date"].dt.date
+st.dataframe(table_data, use_container_width=True, hide_index=True)
+
+# Show description if any race has one
+descs = races_df[races_df["description"].str.len() > 0]
+if not descs.empty:
+    for _, r in descs.iterrows():
+        st.caption(f"**{r['date'].date()} — {r['event']}**: {r['description']}")
 
 # --- Finish time trend ---
 st.subheader("Finish time progression")
@@ -133,6 +178,8 @@ fig_finish.add_trace(
         textfont={"size": 11},
         marker={"size": 10, "color": "royalblue"},
         line={"color": "royalblue", "width": 2},
+        hovertemplate="%{text}<br>%{customdata}<extra></extra>",
+        customdata=races_df["event"],
     )
 )
 fig_finish.update_layout(
@@ -169,17 +216,16 @@ if not hr_races.empty:
     )
     st.plotly_chart(fig_hr, use_container_width=True)
 
-# --- Split-by-split for races with route data ---
+# --- Mile splits for selected race ---
 st.subheader("Mile splits")
 
 race_options = {
-    f"{r['date'].date()} — {r['finish_fmt']}": r["workout_id"]
+    f"{r['date'].date()} — {r['event'] or r['finish_fmt']}": r["workout_id"]
     for _, r in races_df.iterrows()
 }
 selected_label = st.selectbox("Select race", list(race_options.keys()), index=len(race_options) - 1)
 selected_wid = race_options[selected_label]
 
-# Compute mile splits from route data
 route_df = con.execute(
     "SELECT timestamp, lat, lon, elevation_m FROM routes "
     "WHERE workout_id = $1 ORDER BY timestamp",
@@ -235,11 +281,27 @@ else:
 
     splits_df = pd.DataFrame(splits)
 
+    # First/second half split analysis
+    numeric_splits = splits_df[splits_df["Mile"].apply(lambda x: isinstance(x, int))].copy()
+    if len(numeric_splits) >= 20:
+        half = len(numeric_splits) // 2
+        first_half = numeric_splits.iloc[:half]["Split (sec)"].sum()
+        second_half = numeric_splits.iloc[half:]["Split (sec)"].sum()
+        diff = second_half - first_half
+        h1m, h1s = divmod(int(first_half), 60)
+        h2m, h2s = divmod(int(second_half), 60)
+        dm, ds = divmod(abs(int(diff)), 60)
+        split_type = "positive" if diff > 0 else "negative" if diff < 0 else "even"
+
+        sc1, sc2, sc3 = st.columns(3)
+        sc1.metric("First half", f"{h1m}:{h1s:02d}")
+        sc2.metric("Second half", f"{h2m}:{h2s:02d}")
+        sc3.metric("Split", f"{'+'if diff > 0 else '-'}{dm}:{ds:02d} ({split_type})")
+
     # Chart + table side by side
     col_chart, col_table = st.columns([2, 1])
 
     with col_chart:
-        numeric_splits = splits_df[splits_df["Mile"].apply(lambda x: isinstance(x, int))].copy()
         avg_pace = numeric_splits["Split (sec)"].mean()
         fig_splits = go.Figure()
         fig_splits.add_trace(
@@ -261,7 +323,7 @@ else:
             annotation_text=f"avg {int(avg_pace // 60)}:{int(avg_pace % 60):02d}",
         )
         fig_splits.update_layout(
-            height=350,
+            height=400,
             margin={"l": 40, "r": 20, "t": 20, "b": 30},
             xaxis_title="Mile",
             yaxis_title="Split (sec)",
@@ -270,7 +332,8 @@ else:
         st.plotly_chart(fig_splits, use_container_width=True)
 
     with col_table:
-        st.dataframe(splits_df[["Mile", "Pace"]], use_container_width=True, hide_index=True)
+        st.dataframe(splits_df[["Mile", "Pace"]], use_container_width=True, hide_index=True,
+                      height=400)
 
 # --- HR over time for selected race ---
 hr_df = con.execute(
@@ -309,6 +372,29 @@ if len(hr_df) > 10:
         showlegend=False,
     )
     st.plotly_chart(fig_hr_trace, use_container_width=True)
+
+# --- Elevation profile for selected race ---
+if not route_df.empty and route_df["elevation_m"].notna().any():
+    st.subheader("Elevation profile — selected race")
+    fig_elev = go.Figure()
+    fig_elev.add_trace(
+        go.Scatter(
+            x=route_df["cum_mi"],
+            y=route_df["elevation_m"] * 3.28084,  # convert to feet
+            mode="lines",
+            fill="tozeroy",
+            line={"color": "forestgreen", "width": 1.5},
+            fillcolor="rgba(34,139,34,0.2)",
+        )
+    )
+    fig_elev.update_layout(
+        height=250,
+        margin={"l": 40, "r": 20, "t": 20, "b": 30},
+        xaxis_title="Distance (mi)",
+        yaxis_title="Elevation (ft)",
+        showlegend=False,
+    )
+    st.plotly_chart(fig_elev, use_container_width=True)
 
 # ===========================================================================
 # Training Preparation — 16-week build-up for the selected race
@@ -562,7 +648,7 @@ else:
             hovertemplate="%.1f mi<br>%{x|%b %d}<extra></extra>",
         )
     )
-    for ref in [10, 12, 14]:
+    for ref in [16, 18, 20]:
         fig_long.add_hline(
             y=ref, line_dash="dash", line_color="lightgray",
             annotation_text=f"{ref} mi", annotation_position="bottom right",
