@@ -31,6 +31,7 @@ races_df = con.execute("""
     WITH ranked AS (
         SELECT
             w.workout_id,
+            w.name,
             w.start_time,
             CAST(w.start_time AS DATE) AS date,
             w.duration_sec,
@@ -49,7 +50,7 @@ races_df = con.execute("""
           AND w.duration_sec > 0
           AND (w.duration_sec / (w.distance_m / 1609.344) / 60) < 11
     )
-    SELECT workout_id, start_time, date, duration_sec, distance_m,
+    SELECT workout_id, name, start_time, date, duration_sec, distance_m,
            avg_hr, max_hr, elevation_gain_m, device
     FROM ranked
     WHERE rn = 1
@@ -107,6 +108,7 @@ c4.metric("vs PR", f"{'+' if delta_sec >= 0 else ''}{delta_sec / 60:+.1f} min")
 st.subheader("All races")
 table_cols = {
     "date": "Date",
+    "name": "Name",
     "finish_fmt": "Finish",
     "pace_fmt": "Pace /mi",
     "miles": "Miles",
@@ -172,8 +174,15 @@ if not hr_races.empty:
 # --- Split-by-split for races with route data ---
 st.subheader("Mile splits")
 
+def _race_label(r: pd.Series) -> str:
+    base = f"{r['date'].date()} — {r['finish_fmt']}"
+    if pd.notna(r.get("name")) and r["name"]:
+        return f"{r['name']} ({base})"
+    return base
+
+
 race_options = {
-    f"{r['date'].date()} — {r['finish_fmt']}": r["workout_id"]
+    _race_label(r): r["workout_id"]
     for _, r in races_df.iterrows()
 }
 selected_label = st.selectbox("Select race", list(race_options.keys()), index=len(race_options) - 1)

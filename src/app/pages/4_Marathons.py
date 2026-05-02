@@ -31,6 +31,7 @@ races_df = con.execute("""
     WITH ranked AS (
         SELECT
             w.workout_id,
+            w.name,
             w.start_time,
             CAST(w.start_time AS DATE) AS date,
             w.duration_sec,
@@ -50,7 +51,7 @@ races_df = con.execute("""
           AND w.duration_sec > 0
           AND (w.duration_sec / (w.distance_m / 1609.344) / 60) < 14
     )
-    SELECT workout_id, start_time, date, duration_sec, distance_m,
+    SELECT workout_id, name, start_time, date, duration_sec, distance_m,
            avg_hr, max_hr, elevation_gain_m, device, raw
     FROM ranked
     WHERE rn = 1
@@ -86,19 +87,7 @@ races_df["pace_fmt"] = [
     _fmt_pace(s, d) for s, d in zip(races_df["duration_sec"], miles, strict=True)
 ]
 
-# Extract event name/description from raw JSON (Strava metadata)
-def _extract_event_name(raw_str: str) -> str:
-    try:
-        data = json.loads(raw_str)
-        return (
-            data.get("strava_activity_name")
-            or data.get("Activity Name")
-            or ""
-        )
-    except (json.JSONDecodeError, TypeError):
-        return ""
-
-
+# Extract description/gear from raw JSON (Strava metadata)
 def _extract_description(raw_str: str) -> str:
     try:
         data = json.loads(raw_str)
@@ -123,7 +112,6 @@ def _extract_gear(raw_str: str) -> str:
         return ""
 
 
-races_df["event"] = races_df["raw"].apply(_extract_event_name)
 races_df["description"] = races_df["raw"].apply(_extract_description)
 races_df["gear"] = races_df["raw"].apply(_extract_gear)
 
@@ -149,11 +137,11 @@ c4.metric("vs PR", f"{sign}{delta_sec / 60:.1f} min")
 # --- Race summary table ---
 st.subheader("All races")
 table_data = races_df[
-    ["date", "event", "finish_fmt", "pace_fmt", "miles", "avg_hr", "max_hr",
+    ["date", "name", "finish_fmt", "pace_fmt", "miles", "avg_hr", "max_hr",
      "elevation_gain_m", "temp_f", "conditions", "gear"]
 ].copy()
 table_data.columns = [
-    "Date", "Event", "Finish", "Pace /mi", "Miles", "Avg HR", "Max HR",
+    "Date", "Name", "Finish", "Pace /mi", "Miles", "Avg HR", "Max HR",
     "Elevation (m)", "Temp (F)", "Conditions", "Gear",
 ]
 table_data["Date"] = table_data["Date"].dt.date
@@ -163,7 +151,7 @@ st.dataframe(table_data, use_container_width=True, hide_index=True)
 descs = races_df[races_df["description"].str.len() > 0]
 if not descs.empty:
     for _, r in descs.iterrows():
-        st.caption(f"**{r['date'].date()} — {r['event']}**: {r['description']}")
+        st.caption(f"**{r['date'].date()} — {r['name']}**: {r['description']}")
 
 # --- Finish time trend ---
 st.subheader("Finish time progression")
@@ -179,7 +167,7 @@ fig_finish.add_trace(
         marker={"size": 10, "color": "royalblue"},
         line={"color": "royalblue", "width": 2},
         hovertemplate="%{text}<br>%{customdata}<extra></extra>",
-        customdata=races_df["event"],
+        customdata=races_df["name"],
     )
 )
 fig_finish.update_layout(
@@ -219,8 +207,15 @@ if not hr_races.empty:
 # --- Mile splits for selected race ---
 st.subheader("Mile splits")
 
+def _race_label(r: pd.Series) -> str:
+    base = f"{r['date'].date()} — {r['finish_fmt']}"
+    if pd.notna(r.get("name")) and r["name"]:
+        return f"{r['name']} ({base})"
+    return base
+
+
 race_options = {
-    f"{r['date'].date()} — {r['event'] or r['finish_fmt']}": r["workout_id"]
+    _race_label(r): r["workout_id"]
     for _, r in races_df.iterrows()
 }
 selected_label = st.selectbox("Select race", list(race_options.keys()), index=len(race_options) - 1)

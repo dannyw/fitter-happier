@@ -209,9 +209,10 @@ def _enrich_existing_workout(
     raw_data["strava_description"] = strava_row.get("Activity Description")
     raw_data["strava_gear"] = strava_row.get("Activity Gear")
 
+    strava_name = strava_row.get("Activity Name")
     con.execute(
-        "UPDATE workouts SET raw = ? WHERE workout_id = ?",
-        [json.dumps(raw_data), existing_wid],
+        "UPDATE workouts SET raw = ?, name = COALESCE(?, name) WHERE workout_id = ?",
+        [json.dumps(raw_data), strava_name, existing_wid],
     )
 
 
@@ -233,6 +234,7 @@ def _write_workout(
     elevation_gain_m: float | None,
     device: str | None,
     raw: str,
+    name: str | None = None,
 ) -> None:
     """Insert or replace a single workout."""
     df = pl.DataFrame(  # noqa: F841 — referenced by DuckDB SQL
@@ -241,6 +243,7 @@ def _write_workout(
             "source": ["strava"],
             "source_id": [source_id],
             "activity_type": [activity_type],
+            "name": [name],
             "start_time": [start_time],
             "end_time": [end_time],
             "duration_sec": [duration_sec],
@@ -420,6 +423,7 @@ def _process_row(
             con, wid, source_id, activity_type, start_time, end_time,
             duration_sec, distance_m, energy_kcal, avg_hr, max_hr,
             elevation_gain_m, None, raw_json,
+            name=row.get("Activity Name"),
         )
         _write_route_points(con, wid, route_points)
         _write_samples(con, wid, samples)

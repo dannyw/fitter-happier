@@ -111,7 +111,7 @@ if event and event.selection and event.selection.points:
 if selected_activity:
     st.markdown(f"**Workouts: {selected_activity}**")
     detail = con.execute(
-        "SELECT start_time, activity_type, max_hr, avg_hr, "
+        "SELECT start_time, activity_type, name, max_hr, avg_hr, "
         "duration_sec, distance_m, energy_kcal, elevation_gain_m "
         "FROM workouts "
         "WHERE max_hr IS NOT NULL AND max_hr <= 200 AND activity_type = $1 "
@@ -123,12 +123,12 @@ if selected_activity:
     detail["distance"] = (detail["distance_m"] / 1609.344).round(2).astype(str) + " mi"
     detail["distance"] = detail["distance"].replace("nan mi", "–")
     cols = [
-        "date", "activity_type", "max_hr", "avg_hr",
+        "date", "activity_type", "name", "max_hr", "avg_hr",
         "duration", "distance", "energy_kcal", "elevation_gain_m",
     ]
     display = detail[cols].copy()
     display.columns = [
-        "Date", "Activity", "Max HR", "Avg HR",
+        "Date", "Activity", "Name", "Max HR", "Avg HR",
         "Duration", "Distance", "Calories (kcal)", "Elevation (m)",
     ]
     st.dataframe(display, use_container_width=True, hide_index=True)

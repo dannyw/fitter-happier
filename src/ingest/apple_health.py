@@ -31,6 +31,7 @@ from src.ingest.activity_types import normalize_activity_type
 from src.ingest.gpx import parse_gpx
 from src.ingest.timestamps import parse_apple_health_ts
 from src.ingest.units import distance_to_meters, elevation_to_meters, energy_to_kcal
+from src.ingest.workout_names import generate_default_name
 from src.storage.ids import workout_id
 from src.storage.schema import ensure_schema
 
@@ -83,6 +84,7 @@ class WorkoutRecord:
     source: str
     source_id: str | None
     activity_type: str
+    name: str | None
     start_time: datetime
     end_time: datetime
     duration_sec: int
@@ -190,7 +192,11 @@ def _parse_workout(elem: etree._Element) -> WorkoutRecord:
         metadata[key] = val
         if key == "HKElevationAscended":
             try:
-                elevation_gain_m = elevation_to_meters(float(val), "m")
+                parts = val.strip().split()
+                if len(parts) == 2:
+                    elevation_gain_m = elevation_to_meters(float(parts[0]), parts[1])
+                else:
+                    elevation_gain_m = elevation_to_meters(float(val), "m")
             except (ValueError, TypeError):
                 pass
         elif key == "HKExternalUUID":
@@ -219,6 +225,7 @@ def _parse_workout(elem: etree._Element) -> WorkoutRecord:
         source="apple_health",
         source_id=source_id,
         activity_type=activity,
+        name=generate_default_name(activity, start),
         start_time=start,
         end_time=end,
         duration_sec=duration,
@@ -399,6 +406,7 @@ def _write_workouts(con: duckdb.DuckDBPyConnection, workouts: list[WorkoutRecord
                 "source": [w.source for w in chunk],
                 "source_id": [w.source_id for w in chunk],
                 "activity_type": [w.activity_type for w in chunk],
+                "name": [w.name for w in chunk],
                 "start_time": [w.start_time for w in chunk],
                 "end_time": [w.end_time for w in chunk],
                 "duration_sec": [w.duration_sec for w in chunk],

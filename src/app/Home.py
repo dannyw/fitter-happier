@@ -66,6 +66,7 @@ recent_df = con.execute("""
     SELECT
         start_time::DATE AS date,
         activity_type,
+        name,
         round(duration_sec / 60.0, 0) AS minutes,
         round(distance_m / 1609.344, 2) AS miles,
         round(energy_kcal, 0) AS kcal,

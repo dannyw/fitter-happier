@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS workouts (
     source           TEXT,
     source_id        TEXT,
     activity_type    TEXT,
+    name             TEXT,
     start_time       TIMESTAMPTZ,
     end_time         TIMESTAMPTZ,
     duration_sec     INTEGER,
@@ -98,3 +99,7 @@ def ensure_schema(con: duckdb.DuckDBPyConnection) -> None:
     """Create all tables if they don't already exist."""
     for ddl in ALL_DDL:
         con.execute(ddl)
+
+    # -- Migrations ----------------------------------------------------------
+    # Add 'name' column to workouts (for existing databases).
+    con.execute("ALTER TABLE workouts ADD COLUMN IF NOT EXISTS name TEXT")

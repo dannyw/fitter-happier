@@ -28,6 +28,7 @@ con = get_con()
 hikes_df = con.execute("""
     SELECT
         workout_id,
+        name,
         start_time,
         CAST(start_time AS DATE) AS date,
         duration_sec,
@@ -100,6 +101,7 @@ c4.metric("Longest Hike", f"{longest['miles']:.1f} mi", help=str(longest["date"]
 st.subheader("All hikes")
 table_cols = {
     "date": "Date",
+    "name": "Name",
     "miles": "Miles",
     "duration_fmt": "Duration",
     "pace_fmt": "Pace /mi",
@@ -143,7 +145,31 @@ fig_yr.update_layout(
     yaxis_title="Miles",
     showlegend=False,
 )
-st.plotly_chart(fig_yr, use_container_width=True)
+yr_event = st.plotly_chart(fig_yr, use_container_width=True, on_select="rerun")
+
+# Show hikes for clicked year
+selected_yr = None
+if yr_event and yr_event.selection and yr_event.selection.points:
+    selected_yr = int(yr_event.selection.points[0]["x"])
+
+if selected_yr is not None:
+    yr_hikes = hikes_df[hikes_df["yr"] == selected_yr].copy()
+    st.markdown(f"**{selected_yr} — {len(yr_hikes)} hikes, {yr_hikes['miles'].sum():.0f} miles**")
+    yr_table_cols = {
+        "date": "Date",
+        "name": "Name",
+        "miles": "Miles",
+        "duration_fmt": "Duration",
+        "pace_fmt": "Pace /mi",
+        "elev_gain_ft": "Elev Gain (ft)",
+        "avg_hr": "Avg HR",
+        "temp_f": "Temp (F)",
+        "conditions": "Conditions",
+    }
+    yr_display = yr_hikes[list(yr_table_cols.keys())].copy()
+    yr_display.columns = list(yr_table_cols.values())
+    yr_display["Date"] = yr_display["Date"].dt.date
+    st.dataframe(yr_display, use_container_width=True, hide_index=True)
 
 # ---------------------------------------------------------------------------
 # Distance progression over time
@@ -175,8 +201,15 @@ st.plotly_chart(fig_dist, use_container_width=True)
 st.divider()
 st.subheader("Hike detail")
 
+def _hike_label(r: pd.Series) -> str:
+    base = f"{r['date'].date()} — {r['miles']:.1f} mi, {r['duration_fmt']}"
+    if pd.notna(r.get("name")) and r["name"]:
+        return f"{r['name']} ({base})"
+    return base
+
+
 hike_options = {
-    f"{r['date'].date()} — {r['miles']:.1f} mi, {r['duration_fmt']}": r["workout_id"]
+    _hike_label(r): r["workout_id"]
     for _, r in hikes_df.iterrows()
 }
 selected_label = st.selectbox("Select hike", list(hike_options.keys()), index=len(hike_options) - 1)
