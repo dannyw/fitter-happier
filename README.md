@@ -1,6 +1,6 @@
 # fitter-happier
 
-A personal, local-first fitness dashboard. Pulls data from Apple Health and
+A fast, local-first fitness dashboard. Pulls data from Apple Health and
 Strava exports, stores everything in DuckDB, and visualizes it with Streamlit.
 
 Built for people who want to ask their own questions about their own data —
