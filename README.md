@@ -1,7 +1,7 @@
 # fitter-happier
 
 A fast, local-first fitness dashboard. Pulls data from Apple Health and
-Strava exports, stores everything in DuckDB, and visualizes it with Streamlit.
+Strava exports, stores everything in [DuckDB](https://duckdb.org), and visualizes it with [Streamlit](https://streamlit.io).
 
 Built for people who want to ask their own questions about their own data —
 without giving it to anyone else.
@@ -10,7 +10,7 @@ without giving it to anyone else.
 
 - **Ingests** Apple Health XML exports and Strava bulk archives
 - **Normalizes** workouts, GPS routes, heart rate samples, sleep, HRV, VO2max,
-  and resting heart rate into a local DuckDB database
+  and resting heart rate into a local [DuckDB](https://duckdb.org) database
 - **Enriches** with historical weather (Open-Meteo, no API key needed) and
   computed training load (CTL/ATL/TSB)
 - **Visualizes** through a Streamlit dashboard with pages for:
@@ -95,7 +95,7 @@ Apple Health XML / Strava archive
    ingest layer          → normalize raw exports
         │
         ▼
-   DuckDB (local file)   → single source of truth
+   [DuckDB](https://duckdb.org) (local file) → single source of truth
         │
         ▼
    enrich layer          → weather, training load
