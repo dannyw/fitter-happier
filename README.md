@@ -6,6 +6,8 @@ Strava exports, stores everything in [DuckDB](https://duckdb.org), and visualize
 Built for people who want to ask their own questions about their own data —
 without giving it to anyone else.
 
+![Training Load dashboard](docs/screenshot.png)
+
 ## What it does
 
 - **Ingests** Apple Health XML exports and Strava bulk archives
