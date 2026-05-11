@@ -34,6 +34,31 @@ expensive — chart changes are not. All data stays local on your machine.
 - Python 3.11+
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
+## Getting your data
+
+### Apple Health
+
+1. On your iPhone, open the **Health** app
+2. Tap your profile picture (top right)
+3. Scroll down and tap **Export All Health Data**
+4. Tap **Export** — this generates an `export.zip` file
+5. Share it to your Mac (AirDrop is easiest) and put it somewhere like `~/fitness-data/raw/`
+
+The export includes all your workouts, heart rate, sleep, HRV, and GPS routes.
+Exports can be large — 100MB for a year or two of data, several GB if you've
+had an Apple Watch for years. That's normal; the ingest pipeline stream-parses
+the XML so it won't blow up your RAM.
+
+### Strava (optional)
+
+1. Log in at [strava.com](https://www.strava.com)
+2. Go to **Settings → My Account → Download or Delete Your Account**
+3. Click **Request Your Archive** — Strava emails you a download link (usually within an hour)
+4. Download the zip and put it in `~/fitness-data/raw/`
+
+Run Apple Health ingest first, then Strava — the pipeline merges overlapping
+workouts automatically.
+
 ## Quick start
 
 ```bash
