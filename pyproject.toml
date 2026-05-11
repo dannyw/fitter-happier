@@ -1,5 +1,5 @@
 [project]
-name = "fitness-dashboard"
+name = "fitter-happier"
 version = "0.1.0"
 description = "Personal local-first fitness dashboard"
 requires-python = ">=3.11"
