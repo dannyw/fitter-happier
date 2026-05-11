@@ -97,7 +97,7 @@ Apple Health XML / Strava archive
    ingest layer          → normalize raw exports
         │
         ▼
-   DuckDB (local file)          → single source of truth
+   DuckDB (local file)   → single source of truth
         │
         ▼
    enrich layer          → weather, training load
