@@ -419,7 +419,7 @@ def _write_workouts(con: duckdb.DuckDBPyConnection, workouts: list[WorkoutRecord
                 "raw": [w.raw for w in chunk],
             }
         )
-        con.execute("INSERT OR REPLACE INTO workouts SELECT * FROM df")
+        con.execute("INSERT OR REPLACE INTO workouts BY NAME SELECT * FROM df")
     print(f"  Wrote {len(workouts):,} workouts", file=sys.stderr)
 
 
@@ -454,7 +454,7 @@ def _write_samples(
                 "value": rows_value[i:end],
             }
         )
-        con.execute("INSERT OR REPLACE INTO workout_samples SELECT * FROM df")
+        con.execute("INSERT OR REPLACE INTO workout_samples BY NAME SELECT * FROM df")
     print(f"  Wrote {total:,} workout samples", file=sys.stderr)
 
 
@@ -477,7 +477,7 @@ def _write_health_metrics(
                 "source": [m.source for m in chunk],
             }
         )
-        con.execute("INSERT OR REPLACE INTO health_metrics SELECT * FROM df")
+        con.execute("INSERT OR REPLACE INTO health_metrics BY NAME SELECT * FROM df")
     print(f"  Wrote {len(metrics):,} health metrics", file=sys.stderr)
 
 
@@ -516,7 +516,7 @@ def _write_routes(
                 "elevation_m": [p.elevation_m for p in points],
             }
         )
-        con.execute("INSERT OR REPLACE INTO routes SELECT * FROM df")
+        con.execute("INSERT OR REPLACE INTO routes BY NAME SELECT * FROM df")
         total_points += len(points)
 
     print(f"  Wrote {total_points:,} route points", file=sys.stderr)

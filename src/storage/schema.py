@@ -85,6 +85,16 @@ CREATE TABLE IF NOT EXISTS training_load (
 );
 """
 
+# Incremental-sync bookkeeping: one row per source that syncs over an API.
+# last_synced is the high-water mark used as the `after` cursor on the next run.
+SYNC_STATE_DDL = """\
+CREATE TABLE IF NOT EXISTS sync_state (
+    source      TEXT PRIMARY KEY,
+    last_synced TIMESTAMPTZ,
+    updated_at  TIMESTAMPTZ
+);
+"""
+
 ALL_DDL = [
     WORKOUTS_DDL,
     WORKOUT_SAMPLES_DDL,
@@ -92,6 +102,7 @@ ALL_DDL = [
     ROUTES_DDL,
     WEATHER_DDL,
     TRAINING_LOAD_DDL,
+    SYNC_STATE_DDL,
 ]
 
 

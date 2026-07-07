@@ -82,6 +82,12 @@ Responsibility: read a raw export, produce normalized records ready for storage.
 - **No match → insert**: new workout row with `source="strava"`, full CSV row in `raw` JSON; dispatches to FIT/GPX/TCX parsers for activity files
 - Run order: Apple Health first, then Strava. Re-running is idempotent
 
+**Strava API** (`src/ingest/strava_api.py`, opt-in):
+- Incremental sync over the Strava REST API instead of a bulk export
+- OAuth handled in `src/ingest/strava_auth.py` (loopback redirect, `activity:read_all` scope for private activities; tokens in gitignored `data/strava_tokens.json`, auto-refreshed)
+- Reads the `after` cursor from `sync_state`, pages `/athlete/activities`, pulls `/activities/{id}/streams` for routes + HR/cadence/power/speed samples
+- Normalizes to the same records as the bulk export and runs them through the same match/enrich/insert path — an activity seen via both paths shares one `workout_id`
+
 **Activity type normalization** (`src/ingest/activity_types.py`):
 - Maps Apple Health identifiers (`HKWorkoutActivityTypeRunning`) and Strava types (`Run`, `TrailRun`, `Ride`, etc.) to a shared set of lowercase names (`running`, `cycling`, etc.)
 - `normalize_activity_type()` for Apple Health, `normalize_strava_activity_type()` for Strava
@@ -150,6 +156,13 @@ weather (
   precipitation_mm  DOUBLE,
   conditions        TEXT
 );
+
+-- Incremental-sync cursor, one row per API source (e.g. 'strava')
+sync_state (
+  source       TEXT PRIMARY KEY,
+  last_synced  TIMESTAMPTZ,        -- high-water mark used as the `after` cursor
+  updated_at   TIMESTAMPTZ
+);
 ```
 
 Schema migrations: keep migrations as numbered SQL files in `src/storage/migrations/`. On startup, the app applies any pending migrations to the DuckDB file.
@@ -167,6 +180,11 @@ Computed *after* ingest, idempotent. Each enricher reads from storage and writes
 - Compute TRIMP (HR-based load) per workout
 - Roll up into CTL (42-day exponentially weighted), ATL (7-day), TSB (CTL - ATL)
 - Stored as a daily series, recomputed on new ingest
+
+**Source reconciliation** (`src/enrich/reconcile_sources.py`):
+- Cleans up cross-source duplicates when Strava data was ingested before its Apple Health twin existed
+- Merges each Strava workout into the matching Apple Health workout (same type/time/distance criteria as ingest) and deletes the orphan Strava row
+- Idempotent; runs after both ingests, before the derived enrichers
 
 ### App layer
 
@@ -201,12 +219,14 @@ A single `make refresh` (or `just refresh`) target wraps steps 2–6. Apple Heal
 
 ## Decisions resolved
 
-- **Strava sync.** Went with bulk export + merge-at-ingest instead of API sync. No API key needed; user downloads their archive from strava.com/account and runs a CLI command. Merge logic deduplicates overlapping workouts and enriches Apple Health records with Strava metadata.
+- **Strava sync.** Started with bulk export + merge-at-ingest (no API key; user downloads their archive from strava.com/account and runs a CLI command). Merge logic deduplicates overlapping workouts and enriches Apple Health records with Strava metadata.
+- **Strava API sync.** Added as an opt-in path for incremental updates (`src/ingest/strava_api.py`), alongside the bulk export. OAuth2 with a loopback redirect and `activity:read_all` scope (to include private activities); tokens stored in a gitignored `data/strava_tokens.json` (0600); an `after`-cursor high-water mark stored in the `sync_state` table. Reuses the same normalization, `workout_id`, and match/enrich/insert logic as the bulk export, so an activity seen via both paths resolves to one row.
+- **Cross-source reconciliation.** The bulk-export/API merge only dedups against workouts that already exist when Strava ingest runs. If Strava data lands before Apple Health, `src/enrich/reconcile_sources.py` merges each Strava workout into its Apple Health twin (same type/time/distance criteria) and deletes the orphan. Idempotent; runs after both ingests in `make refresh`.
 - **FIT files.** Added `fitdecode`-based parser. Used by Strava ingest for `.fit.gz` activity files; also available standalone.
 
 ## Decisions deferred
 
-- **Strava API sync.** Could replace bulk export for incremental updates. The schema and merge logic already support it — just needs an OAuth flow and polling.
+- **Strava webhooks.** Push-based sync (near-real-time) on top of the API. Requires a public HTTPS callback, so it needs a tunnel — not worth it while daily-refresh polling suffices.
 - **Phone access to dashboard.** Tailscale + Mac-as-host is the obvious path. Don't build until wanted.
 - **Subjective notes per workout.** Not for v1. If added later: a `notes/` directory of markdown files, one per workout, parsed in.
 - **Goal tracking UI.** Need to use the dashboard for a few weeks before designing this — what "a goal" means depends on what I actually train for.

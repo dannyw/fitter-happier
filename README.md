@@ -71,6 +71,9 @@ uv run python -m src.ingest.apple_health ~/fitness-data/raw/export.zip
 # (Optional) Ingest a Strava bulk export
 uv run python -m src.ingest.strava ~/fitness-data/raw/strava-export.zip
 
+# Reconcile duplicate workouts across sources (see note below)
+uv run python -m src.enrich.reconcile_sources
+
 # Enrich with weather + training load
 uv run python -m src.enrich.weather
 uv run python -m src.enrich.training_load
@@ -80,11 +83,72 @@ uv run streamlit run src/app/Home.py
 # → opens at http://localhost:8501
 ```
 
+Or run the whole pipeline at once with the `Makefile`:
+
+```bash
+make refresh    # ingest both sources → reconcile → enrich
+make dashboard  # launch Streamlit
+```
+
+Ingest Apple Health **before** Strava so the merge logic can enrich existing
+workouts instead of duplicating them. If Strava data lands first (e.g. from an
+ongoing sync), `reconcile_sources` cleans up the resulting duplicates on the
+next run — it merges each Strava workout into its Apple Health twin and drops
+the orphan.
+
+## Ongoing Strava sync (optional)
+
+Instead of re-downloading the bulk export, you can sync new Strava activities
+incrementally over the REST API. This is opt-in and requires your own Strava
+API application.
+
+1. Register an app at <https://www.strava.com/settings/api>. Set the
+   **Authorization Callback Domain** to `localhost`.
+2. Put its `client_id` / `client_secret` in `data/strava_tokens.json` (or the
+   `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` environment variables).
+3. Authorize once, then sync:
+
+   ```bash
+   make strava-auth   # opens a browser for one-time consent (activity:read_all)
+   make strava-sync   # fetches activities newer than the last sync
+   ```
+
+4. (Optional) Enrich the newly synced workouts with weather + training load:
+
+   ```bash
+   make enrich
+   ```
+
+The sync requests the `activity:read_all` scope, so it includes your **private**
+activities. It stores a per-source cursor in the `sync_state` table and fetches
+only what's new each run. Activities are matched to existing workouts by the same
+logic as the bulk export, so re-running never duplicates. Tokens live in
+`data/strava_tokens.json` (gitignored, `0600`) and refresh automatically.
+
+**Already imported history via the bulk export?** Seed the cursor to the newest
+activity you already have, so the first API sync only fetches what's newer
+instead of re-pulling everything (which also keeps you well under Strava's API
+rate limits):
+
+```bash
+# skip everything on/before this date
+uv run python -m src.ingest.strava_api --set-cursor 2026-04-26
+make strava-sync
+```
+
+To smoke-test without changing state, `--limit N` processes just `N`
+activities and leaves the cursor untouched:
+
+```bash
+uv run python -m src.ingest.strava_api --limit 3
+```
+
 ## Data stays local
 
-Your health data never leaves your machine. The only external call is to
-[Open-Meteo](https://open-meteo.com/) for historical weather — free, no API key,
-no account. Everything else runs entirely offline.
+Your health data never leaves your machine. The only external calls are to
+[Open-Meteo](https://open-meteo.com/) for historical weather (free, no API key,
+no account) and — **only if you enable it** — the Strava API for ongoing sync,
+using credentials you control. Everything else runs entirely offline.
 
 ## Make it yours with a coding agent
 
