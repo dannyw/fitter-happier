@@ -24,6 +24,18 @@ import httpx
 
 DEFAULT_DB_PATH = Path("data/fitness.duckdb")
 
+# SQL predicate: outdoor workouts that still lack weather. Excludes Apple
+# indoor workouts and Strava virtual/trainer activities (e.g. Zwift), whose GPS
+# coordinates are virtual and would otherwise yield bogus real-world weather.
+# Assumes the query aliases workouts as `w` and LEFT JOINs weather as `wx`.
+_MISSING_OUTDOOR_WEATHER = """
+    wx.workout_id IS NULL
+    AND coalesce(json_extract_string(w.raw, '$.metadata.HKIndoorWorkout'), '0') != '1'
+    AND coalesce(json_extract_string(w.raw, '$.trainer'), 'false') != 'true'
+    AND coalesce(json_extract_string(w.raw, '$.sport_type'), '') NOT LIKE 'Virtual%'
+    AND coalesce(json_extract_string(w.raw, '$.type'), '') NOT LIKE 'Virtual%'
+"""
+
 # -- Apple Health weather condition codes → human-readable labels --------------
 # These are HKWeatherCondition enum values from HealthKit.
 _HK_WEATHER_CONDITIONS: dict[str, str] = {
@@ -221,14 +233,12 @@ def _backfill_open_meteo(con: duckdb.DuckDBPyConnection) -> int:
     Returns the number of rows written.
     """
     # Outdoor workouts missing weather that have route data
-    rows = con.execute("""
+    rows = con.execute(f"""
         SELECT DISTINCT w.workout_id, w.start_time, r.lat, r.lon
         FROM workouts w
         JOIN routes r ON w.workout_id = r.workout_id
         LEFT JOIN weather wx ON w.workout_id = wx.workout_id
-        WHERE wx.workout_id IS NULL
-        AND (json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') IS NULL
-             OR json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1')
+        WHERE {_MISSING_OUTDOOR_WEATHER}
         ORDER BY w.start_time
     """).fetchall()
 
@@ -295,14 +305,12 @@ def enrich_weather(
 
         # Step 2: Optionally backfill with Open-Meteo
         if backfill:
-            remaining = con.execute("""
+            remaining = con.execute(f"""
                 SELECT count(DISTINCT w.workout_id)
                 FROM workouts w
                 JOIN routes r ON w.workout_id = r.workout_id
                 LEFT JOIN weather wx ON w.workout_id = wx.workout_id
-                WHERE wx.workout_id IS NULL
-                AND (json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') IS NULL
-                     OR json_extract_string(w.raw, '$.metadata.HKIndoorWorkout') != '1')
+                WHERE {_MISSING_OUTDOOR_WEATHER}
             """).fetchone()[0]
             print(
                 f"Backfilling {remaining} workouts from Open-Meteo ...",

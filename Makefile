@@ -30,7 +30,7 @@ reconcile:
 	uv run python -m src.enrich.reconcile_sources
 
 enrich:
-	uv run python -m src.enrich.weather
+	uv run python -m src.enrich.weather --backfill
 	uv run python -m src.enrich.training_load
 
 dashboard:

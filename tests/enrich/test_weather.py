@@ -3,17 +3,74 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 import duckdb
 import pytest
 
 from src.enrich.weather import (
+    _MISSING_OUTDOOR_WEATHER,
     _extract_apple_weather,
+    _parse_apple_condition,
     _parse_apple_humidity,
     _parse_apple_temp,
-    _parse_apple_condition,
 )
 from src.storage.schema import ensure_schema
+
+
+class TestMissingOutdoorWeatherPredicate:
+    """The backfill candidate filter must include real outdoor workouts and
+    exclude Apple indoor + Strava virtual/trainer activities."""
+
+    def _candidates(self, con: duckdb.DuckDBPyConnection) -> set[str]:
+        return {
+            r[0]
+            for r in con.execute(f"""
+                SELECT DISTINCT w.workout_id
+                FROM workouts w
+                JOIN routes r ON w.workout_id = r.workout_id
+                LEFT JOIN weather wx ON w.workout_id = wx.workout_id
+                WHERE {_MISSING_OUTDOOR_WEATHER}
+            """).fetchall()
+        }
+
+    def test_filters_indoor_and_virtual(self) -> None:
+        con = duckdb.connect(":memory:")
+        ensure_schema(con)
+
+        cases = {
+            "outdoor": {"sport_type": "Run"},                       # included
+            "virtual": {"sport_type": "VirtualRide"},               # excluded
+            "trainer": {"type": "Ride", "trainer": True},           # excluded
+            "apple_indoor": {"metadata": {"HKIndoorWorkout": "1"}},  # excluded
+        }
+        for wid, raw in cases.items():
+            con.execute(
+                "INSERT INTO workouts (workout_id, source, activity_type, raw) "
+                "VALUES (?, 'strava', 'x', ?)",
+                [wid, json.dumps(raw)],
+            )
+            # Every workout has a route point so the JOIN matches.
+            con.execute(
+                "INSERT INTO routes VALUES (?, ?, 40.0, -74.0, 1.0)",
+                [wid, datetime(2026, 1, 1)],
+            )
+
+        assert self._candidates(con) == {"outdoor"}
+
+    def test_excludes_workouts_that_already_have_weather(self) -> None:
+        con = duckdb.connect(":memory:")
+        ensure_schema(con)
+        con.execute(
+            "INSERT INTO workouts (workout_id, source, activity_type, raw) "
+            "VALUES ('w1', 'strava', 'running', '{\"sport_type\":\"Run\"}')"
+        )
+        con.execute(
+            "INSERT INTO routes VALUES ('w1', ?, 40.0, -74.0, 1.0)",
+            [datetime(2026, 1, 1)],
+        )
+        con.execute("INSERT INTO weather VALUES ('w1', 10.0, 50.0, 1.0, 0.0, 'clear')")
+        assert self._candidates(con) == set()
 
 
 class TestParseAppleTemp:
