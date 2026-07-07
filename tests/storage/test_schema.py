@@ -16,7 +16,15 @@ def con() -> duckdb.DuckDBPyConnection:
     c.close()
 
 
-EXPECTED_TABLES = {"workouts", "workout_samples", "health_metrics", "routes", "weather", "training_load"}
+EXPECTED_TABLES = {
+    "workouts",
+    "workout_samples",
+    "health_metrics",
+    "routes",
+    "weather",
+    "training_load",
+    "sync_state",
+}
 
 
 def test_ensure_schema_creates_tables(con: duckdb.DuckDBPyConnection) -> None:
@@ -48,6 +56,7 @@ def test_workouts_columns(con: duckdb.DuckDBPyConnection) -> None:
         "source",
         "source_id",
         "activity_type",
+        "name",
         "start_time",
         "end_time",
         "duration_sec",

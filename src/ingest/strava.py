@@ -18,6 +18,7 @@ import json
 import sys
 import tempfile
 import zipfile
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -182,10 +183,34 @@ def _find_matching_workout(
     return None
 
 
+def _strava_metadata(strava_row: Mapping[str, object]) -> dict[str, str | None]:
+    """Extract the Strava metadata we surface, from either export or API shape.
+
+    The bulk export (``activities.csv``) uses title-case column names
+    (``Activity Name``); the REST API uses lowercase JSON keys (``name``). This
+    reads whichever is present so ingest, API sync, and reconciliation all merge
+    metadata identically.
+    """
+
+    def _pick(*keys: str) -> str | None:
+        for key in keys:
+            val = strava_row.get(key)
+            if val is not None and val != "":
+                return str(val)
+        return None
+
+    return {
+        "strava_activity_id": _pick("Activity ID", "id"),
+        "strava_activity_name": _pick("Activity Name", "name"),
+        "strava_description": _pick("Activity Description", "description"),
+        "strava_gear": _pick("Activity Gear", "gear_id"),
+    }
+
+
 def _enrich_existing_workout(
     con: duckdb.DuckDBPyConnection,
     existing_wid: str,
-    strava_row: dict[str, str | None],
+    strava_row: Mapping[str, object],
 ) -> None:
     """Enrich an existing workout with Strava metadata.
 
@@ -203,13 +228,10 @@ def _enrich_existing_workout(
     except (json.JSONDecodeError, TypeError):
         raw_data = {}
 
-    # Add Strava-specific metadata
-    raw_data["strava_activity_id"] = strava_row.get("Activity ID")
-    raw_data["strava_activity_name"] = strava_row.get("Activity Name")
-    raw_data["strava_description"] = strava_row.get("Activity Description")
-    raw_data["strava_gear"] = strava_row.get("Activity Gear")
+    metadata = _strava_metadata(strava_row)
+    raw_data.update(metadata)
 
-    strava_name = strava_row.get("Activity Name")
+    strava_name = metadata["strava_activity_name"]
     con.execute(
         "UPDATE workouts SET raw = ?, name = COALESCE(?, name) WHERE workout_id = ?",
         [json.dumps(raw_data), strava_name, existing_wid],
@@ -256,7 +278,7 @@ def _write_workout(
             "raw": [raw],
         }
     )
-    con.execute("INSERT OR REPLACE INTO workouts SELECT * FROM df")
+    con.execute("INSERT OR REPLACE INTO workouts BY NAME SELECT * FROM df")
 
 
 def _write_route_points(
@@ -276,7 +298,7 @@ def _write_route_points(
             "elevation_m": [p.elevation_m for p in points],
         }
     )
-    con.execute("INSERT OR REPLACE INTO routes SELECT * FROM df")
+    con.execute("INSERT OR REPLACE INTO routes BY NAME SELECT * FROM df")
 
 
 def _write_samples(
@@ -322,7 +344,7 @@ def _write_samples(
             "value": rows_value,
         }
     )
-    con.execute("INSERT OR REPLACE INTO workout_samples SELECT * FROM df")
+    con.execute("INSERT OR REPLACE INTO workout_samples BY NAME SELECT * FROM df")
 
 
 def _backfill_route_samples(
